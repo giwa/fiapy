@@ -55,7 +55,7 @@ def validating_server_factory(config):
             try:
                 self.sock = ctx.wrap_socket(sock)
             except ssl.SSLError:
-                # we have to capture the exception here and raise later because 
+                # we have to capture the exception here and raise later because
                 # httplib2 tries to ignore exceptions on connect
                 import sys
                 self._exc_info = sys.exc_info()
@@ -90,7 +90,7 @@ def postrequest(url, body=None, ctype='text/xml; charset=utf-8', config=None):
     #
     # set http_args
     #
-    http_args = {}        
+    http_args = {}
     if config.security_level:
         http_args['connection_type'] = validating_server_factory(config)
     #
@@ -114,24 +114,23 @@ def postrequest(url, body=None, ctype='text/xml; charset=utf-8', config=None):
 
 def soapGetAddressLocation(wsdl):
     service_port = None
-    f = open(opt.wsdl)
-    line = f.readlines()
-    while line:
-        r = re.search(r'<soap:address location="([^"]+)"', line)
-        if r != None:
-            service_port = r.group(1)
-            break
-        line = f.readlines()
-    if service_port == None:
+    with open(opt.wsdl) as f:
+        for line in f:
+            r = re.search(r'<soap:address location="([^"]+)"', line)
+            if r:
+                service_port = r.group(1)
+                break
+
+    if service_port is None:
         return None
-    (a, p) = service_port.split(':')
-    return (a, p)
+    a, p = service_port.split(':')
+    return a, p
 
 def set_default_port(url):
-    (schema, dummy, host) = url.split('/', 2)
+    schema, dummy, host = url.split('/', 2)
     path = ''
     if host.count('/') != 0:
-        (host, path) = host.split('/', 1)
+        host, path = host.split('/', 1)
     if host.count(':') == 0:
         port = 18880
         if schema == 'https:':
@@ -163,87 +162,85 @@ def parse_args():
         help='specify the debug level. 0, 1, or 2')
     return p.parse_args()
 
-#
-# main
-#
-opt = parse_args()
-if opt.url.startswith('https://'):
-    sec_lv = 1
-sec_lv = opt.sec_lv
-url, host = set_default_port(opt.url)
-if opt.debug >= 1:
-    print 'DEBUG: connect to', host
+if __name__ == "__main__":
+    opt = parse_args()
+    if opt.url.startswith('https://'):
+        sec_lv = 1
+    sec_lv = opt.sec_lv
+    url, host = set_default_port(opt.url)
+    if opt.debug >= 1:
+        print 'DEBUG: connect to', host
 
-#soapGetAddressLocation(opt.wsdl)
+    #soapGetAddressLocation(opt.wsdl)
 
-if opt.bfile != None:
-    fp = open(opt.bfile)
-else:
-    fp = sys.stdin
-src = fp.read()
-if src == None:
-    print 'ERROR: src document is nothing'
-    exit(1)
-
-fiap = fiapProto.fiapProto(debug=opt.debug)
-
-#
-# make a request
-#
-req_doc = ''
-if opt.req_to_xml == True:
-    ctype = 'text/xml; charset=utf-8'
-    if re.match('^\<\?xml', src):
-        req_doc = src
+    if opt.bfile is not None:
+        fp = open(opt.bfile)
     else:
-        req_doc = fiap.JSONtoXML(src)
-else:
-    ctype = 'text/json; charset=utf-8'
-    if re.match('^\<\?xml', src) == None:
-        req_doc = src
-    else:
-        req_doc = fiap.XMLtoJSON(src)
-if req_doc == None:
-    print 'ERROR: %s' % fiap.getemsg()
-    exit(1)
-
-if opt.debug >= 1:
-    print 'DEBUG: Request:', req_doc
-
-#
-# parse the configuration file if specified.
-#
-cf = fiapConfig.fiapConfig(opt.cfile, security_level=sec_lv, debug=opt.debug)
-#
-# send the request and get a response.
-#
-res = postrequest(url, body=req_doc, ctype=ctype, config=cf)
-if res == None:
-    print 'ERROR(FIAP): ' + fiap.emsg
-    exit(1)
-if opt.debug >= 1:
-    print 'DEBUG: Response:', res
-
-#
-# print the response
-#
-if opt.res_to_xml == True:
-    if re.match('^\<\?xml', res):
-        res_doc = res
-    else:
-        res_doc = fiap.JSONtoXML(res)
-else:
-    if re.match('^\<\?xml', res):
-        res_doc = fiap.XMLtoJSON(res)
-    else:
-        res_doc = res
-    try:
-        res_doc = json.dumps(json.loads(res_doc), indent=2)
-    except ValueError as e:
-        print 'ERROR: JSON parse error', e
+        fp = sys.stdin
+    src = fp.read()
+    if src is None:
+        print 'ERROR: src document is nothing'
         exit(1)
-if req_doc == None:
-    print 'ERROR: %s' % fiap.getemsg()
-    exit(1)
 
-print res_doc
+    fiap = fiapProto.fiapProto(debug=opt.debug)
+
+    #
+    # make a request
+    #
+    req_doc = ''
+    if opt.req_to_xml == True:
+        ctype = 'text/xml; charset=utf-8'
+        if re.match('^\<\?xml', src):
+            req_doc = src
+        else:
+            req_doc = fiap.JSONtoXML(src)
+    else:
+        ctype = 'text/json; charset=utf-8'
+        if re.match('^\<\?xml', src) == None:
+            req_doc = src
+        else:
+            req_doc = fiap.XMLtoJSON(src)
+    if req_doc is None:
+        print 'ERROR: %s' % fiap.getemsg()
+        exit(1)
+
+    if opt.debug >= 1:
+        print 'DEBUG: Request:', req_doc
+
+    #
+    # parse the configuration file if specified.
+    #
+    cf = fiapConfig.fiapConfig(opt.cfile, security_level=sec_lv, debug=opt.debug)
+    #
+    # send the request and get a response.
+    #
+    res = postrequest(url, body=req_doc, ctype=ctype, config=cf)
+    if res is None:
+        print 'ERROR(FIAP): ' + fiap.emsg
+        exit(1)
+    if opt.debug >= 1:
+        print 'DEBUG: Response:', res
+
+    #
+    # print the response
+    #
+    if opt.res_to_xml == True:
+        if re.match('^\<\?xml', res):
+            res_doc = res
+        else:
+            res_doc = fiap.JSONtoXML(res)
+    else:
+        if re.match('^\<\?xml', res):
+            res_doc = fiap.XMLtoJSON(res)
+        else:
+            res_doc = res
+        try:
+            res_doc = json.dumps(json.loads(res_doc), indent=2)
+        except ValueError as e:
+            print 'ERROR: JSON parse error', e
+            exit(1)
+    if req_doc is None:
+        print 'ERROR: %s' % fiap.getemsg()
+        exit(1)
+
+    print res_doc
